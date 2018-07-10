@@ -56,9 +56,9 @@ updateGameGenerateFruit game@Game { getBoard = board, getGameStdGen = gameGen } 
     game { getFruit = fruit, getGameStdGen = newGameStdGen }
 
 translateDirection :: Maybe Char -> Maybe Direction
-translateDirection (Just 'w') = Just (0, 1)
+translateDirection (Just 'w') = Just (0, -1)
 translateDirection (Just 'a') = Just (-1, 0)
-translateDirection (Just 's') = Just (0, -1)
+translateDirection (Just 's') = Just (0, 1)
 translateDirection (Just 'd') = Just (1, 0)
 translateDirection _   = Nothing
 
