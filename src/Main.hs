@@ -84,10 +84,10 @@ subtractCoord :: Coord -> Coord -> Coord
 subtractCoord (x1, y1) (x2, y2) = (x1 - x2, y1 - y2)
 
 moveSnake :: Direction -> Snake -> Snake
-moveSnake direction snake = addNewHead direction . tail $ snake
+moveSnake direction = addNewHead direction . tail
   where
     addNewHead ::  Direction -> Snake -> Snake
-    addNewHead direction' snake' = snake ++ [calculateHead direction' snake']
+    addNewHead direction' snake' = snake' ++ [calculateHead direction' snake']
 
     calculateHead ::  Direction -> Snake -> (Int, Int)
     calculateHead direction' snake' = addCoord direction' $ last snake'
