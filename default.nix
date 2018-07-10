@@ -2,6 +2,8 @@
 , base
 , stdenv
 , random
+, monad-loops
+, ansi-terminal
 , development ? false
 , hlint }:
 let
@@ -10,7 +12,10 @@ let
                  src = ./.;
                  isLibrary = false;
                  isExecutable = true;
-                 executableHaskellDepends = [ base random ];
+                 executableHaskellDepends = [ base
+                                              random
+                                              monad-loops
+                                              ansi-terminal ];
                  homepage = "https://github.com/fmnasution/snek";
                  license = stdenv.lib.licenses.bsd3; };
   option = if development
