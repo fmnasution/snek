@@ -95,9 +95,6 @@ collideWithSelf snake = elem (last snake) . init $ snake
 addCoord :: Coord -> Coord -> Coord
 addCoord (x1, y1) (x2, y2) = (x1 + x2, y1 + y2)
 
-subtractCoord :: Coord -> Coord -> Coord
-subtractCoord (x1, y1) (x2, y2) = (x1 - x2, y1 - y2)
-
 toCoord :: Coord -> Direction -> Coord
 toCoord coord North = addCoord coord (0, -1)
 toCoord coord West = addCoord coord (-1, 0)
@@ -106,10 +103,10 @@ toCoord coord East = addCoord coord (1, 0)
 
 moveSnake :: Direction -> Snake -> Snake
 moveSnake direction =
-  moveHead direction . moveTail
+  moveHead . moveTail
   where
-    moveHead :: Direction -> Snake -> Snake
-    moveHead direction' snake' = snake' ++ [toCoord (last snake') direction']
+    moveHead :: Snake -> Snake
+    moveHead snake' = snake' ++ [toCoord (last snake') direction]
 
     moveTail = tail
 
@@ -130,17 +127,18 @@ updateGameGrowSnake :: Game -> Game
 updateGameGrowSnake game@Game { getEatenFruits = [] } = game
 updateGameGrowSnake game@Game
   { getSnake = snake , getEatenFruits = (eatenFruitFirst:eatenFruitsTail) }
-  | eatenFruitFirst `shouldGrowSnake` snake =
+  | shouldGrowSnake =
       game { getSnake       = eatenFruitFirst : snake
            , getEatenFruits = eatenFruitsTail }
   | otherwise                               = game
   where
-    shouldGrowSnake :: Fruit -> Snake -> Bool
-    shouldGrowSnake eatenFruit' snake' =
+    shouldGrowSnake :: Bool
+    shouldGrowSnake =
       let
-        (snakeTail:afterSnakeTail:_) = snake'
+        (snakeTail:afterSnakeTail:_) = snake
       in
-        isAdjacent snakeTail eatenFruit' && eatenFruit' /= afterSnakeTail
+        isAdjacent snakeTail eatenFruitFirst
+        && eatenFruitFirst /= afterSnakeTail
 
     isAdjacent :: Coord -> Coord -> Bool
     isAdjacent c1 c2 = f North || f East || f West || f South
@@ -200,14 +198,14 @@ constructRow Game { getBoard       = board
                   , getFruit       = fruit
                   , getSnake       = snake
                   , getEatenFruits = eatenFruits } =
-  (fmap . fmap) (translateCoord fruit eatenFruits snake) board
+  (fmap . fmap) translateCoord  board
   where
-    translateCoord :: Fruit -> [Fruit] -> Snake -> Coord -> Char
-    translateCoord fruit' eatenFruits' snake' coord'
-      | coord' `elem` eatenFruits' = '$'
-      | fruit' == coord'           = '#'
-      | coord' `elem` snake'       = '@'
-      | otherwise                  = ' '
+    translateCoord ::  Coord -> Char
+    translateCoord  coord
+      | coord `elem` eatenFruits = '$'
+      | fruit == coord           = '#'
+      | coord `elem` snake       = '@'
+      | otherwise                = ' '
 
 applyBorder :: BoardSize -> [String] -> [String]
 applyBorder (xLength, _) rows  =
