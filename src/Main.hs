@@ -26,7 +26,7 @@ type BoardSize = (Int,  Int)
 
 type Board = [[Coord]]
 
-type Direction = (Int, Int)
+data Direction = North | East | West | South
 
 type Fruit = Coord
 
@@ -36,7 +36,7 @@ data Game = Game { getBoardSize  :: BoardSize
                  , getDirection  :: Direction
                  , getFruit      :: Fruit
                  , getEatenFruit :: Maybe Fruit
-                 , getGameStdGen :: StdGen} deriving (Show)
+                 , getGameStdGen :: StdGen }
 
 createBoard :: (Int, Int) -> Board
 createBoard (x, y) = [[(x', y') | x' <- [1..x]] | y' <- [1..y]]
@@ -55,16 +55,28 @@ updateGameGenerateFruit game@Game { getBoard = board, getGameStdGen = gameGen } 
   in
     game { getFruit = fruit, getGameStdGen = newGameStdGen }
 
-translateDirection :: Maybe Char -> Maybe Direction
-translateDirection (Just 'w') = Just (0, -1)
-translateDirection (Just 'a') = Just (-1, 0)
-translateDirection (Just 's') = Just (0, 1)
-translateDirection (Just 'd') = Just (1, 0)
-translateDirection _   = Nothing
+keypressDirection :: Maybe Char -> Maybe Direction
+keypressDirection (Just 'w') = Just North
+keypressDirection (Just 'a') = Just West
+keypressDirection (Just 's') = Just South
+keypressDirection (Just 'd') = Just East
+keypressDirection _   = Nothing
 
 updateGameDirection :: Maybe Direction ->  Game -> Game
 updateGameDirection Nothing game = game
-updateGameDirection (Just direction) game = game { getDirection = direction }
+updateGameDirection (Just direction) game
+  | opposite direction (getDirection game) = game
+  | otherwise                              = game { getDirection = direction }
+  where
+    opposite :: Direction -> Direction -> Bool
+    opposite North South = True
+    opposite North _     = False
+    opposite East West   = True
+    opposite East _      = False
+    opposite West East   = True
+    opposite West _      = False
+    opposite South North = True
+    opposite South _     = False
 
 collided :: BoardSize -> Snake -> Bool
 collided (boardX, boardY) snake =
@@ -90,7 +102,14 @@ moveSnake direction = addNewHead direction . tail
     addNewHead direction' snake' = snake' ++ [calculateHead direction' snake']
 
     calculateHead ::  Direction -> Snake -> (Int, Int)
-    calculateHead direction' snake' = addCoord direction' $ last snake'
+    calculateHead direction' snake' =
+      addCoord (translateDirection direction') $ last snake'
+
+    translateDirection :: Direction -> (Int, Int)
+    translateDirection North = (0, -1)
+    translateDirection West = (-1, 0)
+    translateDirection South = (0, 1)
+    translateDirection East = (1, 0)
 
 updateGameSnakeMovement :: Game -> Game
 updateGameSnakeMovement game@Game { getDirection = direction
@@ -143,14 +162,14 @@ initGame =
                 return Game { getBoardSize  = boardSize
                             , getBoard      = board
                             , getSnake      = [(1, 1), (2, 1), (3, 1)]
-                            , getDirection  = (1, 0)
+                            , getDirection  = East
                             , getFruit      = fruit
                             , getEatenFruit = Nothing
                             , getGameStdGen = gameStdGen }
 
 updateGame :: Maybe Char -> Game ->  Game
 updateGame directionKey =
-  updateGameDirection (translateDirection directionKey)
+  updateGameDirection (keypressDirection directionKey)
   . updateGamePerTick
 
 tickGame :: Int -> Game -> IO Game
