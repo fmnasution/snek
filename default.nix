@@ -4,6 +4,7 @@
 , random
 , monad-loops
 , ansi-terminal
+, async
 , development ? false
 , hlint }:
 let
@@ -15,7 +16,8 @@ let
                  executableHaskellDepends = [ base
                                               random
                                               monad-loops
-                                              ansi-terminal ];
+                                              ansi-terminal
+                                              async ];
                  homepage = "https://github.com/fmnasution/snek";
                  license = stdenv.lib.licenses.bsd3; };
   option = if development
