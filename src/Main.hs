@@ -1,5 +1,7 @@
 module Main where
 
+import Control.Concurrent ( threadDelay )
+import Control.Concurrent.Async ( concurrently )
 import Control.Monad.Loops ( iterateUntilM )
 import System.Console.ANSI ( clearScreen, setCursorPosition )
 import System.IO ( hSetBuffering
@@ -14,7 +16,7 @@ main :: IO Game
 main =
   initScreen
   >> initGame
-  >>= iterateUntilM gameOver (tickGame 200000)
+  >>= iterateUntilM gameOver (tickGame 150000)
 
 -- game logic
 
@@ -175,8 +177,8 @@ updateGame directionKey =
 
 tickGame :: Int -> Game -> IO Game
 tickGame tickLength game =
-  updateGame' game
-  <$> timeout tickLength getChar
+  updateGame' game . fst
+  <$> concurrently (timeout tickLength getChar) (threadDelay tickLength)
   >>= renderGame
   where
     updateGame' = flip updateGame
@@ -192,18 +194,18 @@ constructRow Game{ getBoard      = board
                  , getFruit      = fruit
                  , getSnake      = snake
                  , getEatenFruit = eatenFruit } =
-  (fmap . fmap) (translateCoord fruit snake) board
+  (fmap . fmap) (translateCoord fruit eatenFruit snake) board
   where
-    translateCoord :: Fruit -> Snake -> Coord -> Char
-    translateCoord fruit' snake' coord'
-      | isEatenFruit eatenFruit coord' = '%'
-      | fruit' == coord'               = '#'
-      | coord' `elem` snake'           = '@'
-      | otherwise                      = ' '
+    translateCoord :: Fruit -> Maybe Fruit -> Snake -> Coord -> Char
+    translateCoord fruit' eatenFruit' snake' coord'
+      | eatenFruit' `isEatenFruit` coord' = '%'
+      | fruit' == coord'                  = '#'
+      | coord' `elem` snake'              = '@'
+      | otherwise                         = ' '
 
     isEatenFruit :: Maybe Fruit -> Coord -> Bool
     isEatenFruit Nothing _ = False
-    isEatenFruit (Just eatenFruit') coord'' = eatenFruit' == coord''
+    isEatenFruit (Just eatenFruit') coord' = eatenFruit' == coord'
 
 applyBorder :: BoardSize -> [String] -> [String]
 applyBorder (xLength, _) rows  =
