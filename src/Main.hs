@@ -1,14 +1,14 @@
 module Main where
 
-import Control.Monad.Loops (iterateUntilM)
-import System.Console.ANSI (clearScreen, setCursorPosition)
+import Control.Monad.Loops ( iterateUntilM )
+import System.Console.ANSI ( clearScreen, setCursorPosition )
 import System.IO ( hSetBuffering
                  , BufferMode(NoBuffering)
                  , stdin
                  , stdout
                  , hSetEcho)
-import System.Random (randomR, getStdGen, StdGen)
-import System.Timeout (timeout)
+import System.Random ( randomR, getStdGen, StdGen )
+import System.Timeout ( timeout )
 
 main :: IO Game
 main =
@@ -188,16 +188,22 @@ renderGame game =
   >> return game
 
 constructRow :: Game -> [String]
-constructRow Game{ getBoard = board
-                 , getFruit = fruit
-                 , getSnake = snake } =
+constructRow Game{ getBoard      = board
+                 , getFruit      = fruit
+                 , getSnake      = snake
+                 , getEatenFruit = eatenFruit } =
   (fmap . fmap) (translateCoord fruit snake) board
   where
     translateCoord :: Fruit -> Snake -> Coord -> Char
     translateCoord fruit' snake' coord'
-      | fruit' == coord'     = '#'
-      | coord' `elem` snake' = '@'
-      | otherwise            = ' '
+      | isEatenFruit eatenFruit coord' = '%'
+      | fruit' == coord'               = '#'
+      | coord' `elem` snake'           = '@'
+      | otherwise                      = ' '
+
+    isEatenFruit :: Maybe Fruit -> Coord -> Bool
+    isEatenFruit Nothing _ = False
+    isEatenFruit (Just eatenFruit') coord'' = eatenFruit' == coord''
 
 applyBorder :: BoardSize -> [String] -> [String]
 applyBorder (xLength, _) rows  =
