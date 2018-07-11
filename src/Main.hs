@@ -32,13 +32,13 @@ data Direction = North | East | West | South
 
 type Fruit = Coord
 
-data Game = Game { getBoardSize  :: BoardSize
-                 , getBoard      :: Board
-                 , getSnake      :: Snake
-                 , getDirection  :: Direction
-                 , getFruit      :: Fruit
-                 , getEatenFruit :: Maybe Fruit
-                 , getGameStdGen :: StdGen }
+data Game = Game { getBoardSize   :: BoardSize
+                 , getBoard       :: Board
+                 , getSnake       :: Snake
+                 , getDirection   :: Direction
+                 , getFruit       :: Fruit
+                 , getEatenFruits :: [Fruit]
+                 , getGameStdGen  :: StdGen }
 
 createBoard :: (Int, Int) -> Board
 createBoard (x, y) = [[(x', y') | x' <- [1..x]] | y' <- [1..y]]
@@ -119,19 +119,21 @@ updateGameSnakeDirection game@Game { getDirection = direction
   game { getSnake = moveSnake direction snake }
 
 updateGameFruitEating :: Game -> Game
-updateGameFruitEating game@Game { getSnake = snake , getFruit = fruit }
+updateGameFruitEating game@Game { getSnake       = snake
+                                , getFruit       = fruit
+                                , getEatenFruits = eatenFruits }
   | fruit == last snake =
-      updateGameGenerateFruit game { getEatenFruit = Just fruit }
+      updateGameGenerateFruit game { getEatenFruits = eatenFruits ++ [fruit] }
   | otherwise           = game
 
 updateGameGrowSnake :: Game -> Game
-updateGameGrowSnake game@Game { getEatenFruit = Nothing } = game
-updateGameGrowSnake game@Game { getSnake = snake
-                              , getEatenFruit = Just eatenFruit }
-  | eatenFruit `shouldGrowSnake` snake =
-      game { getSnake      = eatenFruit : snake
-           , getEatenFruit = Nothing }
-  | otherwise                          = game
+updateGameGrowSnake game@Game { getEatenFruits = [] } = game
+updateGameGrowSnake game@Game
+  { getSnake = snake , getEatenFruits = (eatenFruitFirst:eatenFruitsTail) }
+  | eatenFruitFirst `shouldGrowSnake` snake =
+      game { getSnake       = eatenFruitFirst : snake
+           , getEatenFruits = eatenFruitsTail }
+  | otherwise                               = game
   where
     shouldGrowSnake :: Fruit -> Snake -> Bool
     shouldGrowSnake eatenFruit' snake' =
@@ -166,13 +168,13 @@ initGame =
                 board = createBoard boardSize
                 (fruit, gameStdGen) = generateFruit board gen
               in
-                return Game { getBoardSize  = boardSize
-                            , getBoard      = board
-                            , getSnake      = [(1, 1), (2, 1), (3, 1)]
-                            , getDirection  = East
-                            , getFruit      = fruit
-                            , getEatenFruit = Nothing
-                            , getGameStdGen = gameStdGen }
+                return Game { getBoardSize   = boardSize
+                            , getBoard       = board
+                            , getSnake       = [(1, 1), (2, 1), (3, 1)]
+                            , getDirection   = East
+                            , getFruit       = fruit
+                            , getEatenFruits = []
+                            , getGameStdGen  = gameStdGen }
 
 updateGame :: Maybe Char -> Game ->  Game
 updateGame directionKey =
@@ -194,22 +196,18 @@ renderGame game =
   >> return game
 
 constructRow :: Game -> [String]
-constructRow Game { getBoard      = board
-                  , getFruit      = fruit
-                  , getSnake      = snake
-                  , getEatenFruit = eatenFruit } =
-  (fmap . fmap) (translateCoord fruit eatenFruit snake) board
+constructRow Game { getBoard       = board
+                  , getFruit       = fruit
+                  , getSnake       = snake
+                  , getEatenFruits = eatenFruits } =
+  (fmap . fmap) (translateCoord fruit eatenFruits snake) board
   where
-    translateCoord :: Fruit -> Maybe Fruit -> Snake -> Coord -> Char
-    translateCoord fruit' eatenFruit' snake' coord'
-      | eatenFruit' `isEatenFruit` coord' = '%'
-      | fruit' == coord'                  = '#'
-      | coord' `elem` snake'              = '@'
-      | otherwise                         = ' '
-
-    isEatenFruit :: Maybe Fruit -> Coord -> Bool
-    isEatenFruit Nothing _ = False
-    isEatenFruit (Just eatenFruit') coord' = eatenFruit' == coord'
+    translateCoord :: Fruit -> [Fruit] -> Snake -> Coord -> Char
+    translateCoord fruit' eatenFruits' snake' coord'
+      | coord' `elem` eatenFruits' = '$'
+      | fruit' == coord'           = '#'
+      | coord' `elem` snake'       = '@'
+      | otherwise                  = ' '
 
 applyBorder :: BoardSize -> [String] -> [String]
 applyBorder (xLength, _) rows  =
