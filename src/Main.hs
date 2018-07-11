@@ -78,16 +78,15 @@ updateGameDirection (Just direction) game
     opposite South North = True
     opposite South _     = False
 
-collided :: BoardSize -> Snake -> Bool
-collided (boardX, boardY) snake =
+collideWithBorder :: BoardSize -> Snake -> Bool
+collideWithBorder (boardX, boardY) snake =
   let
-    currentHead@(headX, headY) = last snake
+    (headX, headY) = last snake
   in
-    headX < 0
-    || headY < 0
-    || headX > boardX
-    || headY > boardY
-    || (elem currentHead . init) snake
+    headX < 1 || headY < 1 || headX > boardX || headY > boardY
+
+collideWithSelf :: Snake -> Bool
+collideWithSelf snake = elem (last snake) . init $ snake
 
 addCoord :: Coord -> Coord -> Coord
 addCoord (x1, y1) (x2, y2) = (x1 + x2, y1 + y2)
@@ -147,7 +146,9 @@ updateGamePerTick =
   . updateGameSnakeMovement
 
 gameOver :: Game -> Bool
-gameOver game = collided (getBoardSize game) (getSnake game)
+gameOver Game { getBoardSize = boardSize
+              , getSnake     = snake } =
+  collideWithSelf snake || collideWithBorder boardSize snake
 
 -- IO game
 
