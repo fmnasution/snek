@@ -44,11 +44,13 @@ createBoard :: (Int, Int) -> Board
 createBoard (x, y) = [[(x', y') | x' <- [1..x]] | y' <- [1..y]]
 
 generateFruit :: Board -> StdGen -> (Fruit, StdGen)
-generateFruit board stdGen = (fruitPos, gameStdGen)
-  where
+generateFruit board stdGen =
+  let
     flattenedBoard = mconcat board
     (index, gameStdGen) = randomR (0, length flattenedBoard - 1) stdGen
     fruitPos = flattenedBoard !! index
+  in
+    (fruitPos, gameStdGen)
 
 updateGameGenerateFruit :: Game -> Game
 updateGameGenerateFruit game@Game { getBoard = board, getGameStdGen = gameGen } =
@@ -67,7 +69,7 @@ keypressDirection _   = Nothing
 updateGameDirection :: Maybe Direction ->  Game -> Game
 updateGameDirection Nothing game = game
 updateGameDirection (Just direction) game
-  | opposite direction (getDirection game) = game
+  | direction `opposite` getDirection game = game
   | otherwise                              = game { getDirection = direction }
   where
     opposite :: Direction -> Direction -> Bool
@@ -96,56 +98,58 @@ addCoord (x1, y1) (x2, y2) = (x1 + x2, y1 + y2)
 subtractCoord :: Coord -> Coord -> Coord
 subtractCoord (x1, y1) (x2, y2) = (x1 - x2, y1 - y2)
 
+toCoord :: Coord -> Direction -> Coord
+toCoord coord North = addCoord coord (0, -1)
+toCoord coord West = addCoord coord (-1, 0)
+toCoord coord South = addCoord coord (0, 1)
+toCoord coord East = addCoord coord (1, 0)
+
 moveSnake :: Direction -> Snake -> Snake
-moveSnake direction = addNewHead direction . tail
+moveSnake direction =
+  moveHead direction . moveTail
   where
-    addNewHead ::  Direction -> Snake -> Snake
-    addNewHead direction' snake' = snake' ++ [calculateHead direction' snake']
+    moveHead :: Direction -> Snake -> Snake
+    moveHead direction' snake' = snake' ++ [toCoord (last snake') direction']
 
-    calculateHead ::  Direction -> Snake -> (Int, Int)
-    calculateHead direction' snake' =
-      addCoord (translateDirection direction') $ last snake'
+    moveTail = tail
 
-    translateDirection :: Direction -> (Int, Int)
-    translateDirection North = (0, -1)
-    translateDirection West = (-1, 0)
-    translateDirection South = (0, 1)
-    translateDirection East = (1, 0)
-
-updateGameSnakeMovement :: Game -> Game
-updateGameSnakeMovement game@Game { getDirection = direction
-                                  , getSnake     = snake } =
+updateGameSnakeDirection :: Game -> Game
+updateGameSnakeDirection game@Game { getDirection = direction
+                                   , getSnake     = snake } =
   game { getSnake = moveSnake direction snake }
 
 updateGameFruitEating :: Game -> Game
 updateGameFruitEating game@Game { getSnake = snake , getFruit = fruit }
-  | fruitAtHead = updateGameGenerateFruit game { getEatenFruit = Just fruit }
-  | otherwise   = game
-    where
-      fruitAtHead = fruit == last snake
+  | fruit == last snake =
+      updateGameGenerateFruit game { getEatenFruit = Just fruit }
+  | otherwise           = game
 
 updateGameGrowSnake :: Game -> Game
-updateGameGrowSnake game@Game { getSnake = snake, getEatenFruit = eatenFruit } =
-  case eatenFruit of
-    Nothing -> game
-    Just eatenFruit' -> if shouldGrowSnake eatenFruit' snake
-                           then game { getSnake      = eatenFruit' : snake
-                                     , getEatenFruit = Nothing }
-                           else game
+updateGameGrowSnake game@Game { getEatenFruit = Nothing } = game
+updateGameGrowSnake game@Game { getSnake = snake
+                              , getEatenFruit = Just eatenFruit }
+  | eatenFruit `shouldGrowSnake` snake =
+      game { getSnake      = eatenFruit : snake
+           , getEatenFruit = Nothing }
+  | otherwise                          = game
   where
     shouldGrowSnake :: Fruit -> Snake -> Bool
     shouldGrowSnake eatenFruit' snake' =
       let
         (snakeTail:afterSnakeTail:_) = snake'
       in
-        subtractCoord afterSnakeTail snakeTail
-        == subtractCoord snakeTail eatenFruit'
+        isAdjacent snakeTail eatenFruit' && eatenFruit' /= afterSnakeTail
+
+    isAdjacent :: Coord -> Coord -> Bool
+    isAdjacent c1 c2 = f North || f East || f West || f South
+      where
+        f direction = toCoord c1 direction == c2
 
 updateGamePerTick :: Game -> Game
 updateGamePerTick =
   updateGameGrowSnake
   . updateGameFruitEating
-  . updateGameSnakeMovement
+  . updateGameSnakeDirection
 
 gameOver :: Game -> Bool
 gameOver Game { getBoardSize = boardSize
@@ -190,10 +194,10 @@ renderGame game =
   >> return game
 
 constructRow :: Game -> [String]
-constructRow Game{ getBoard      = board
-                 , getFruit      = fruit
-                 , getSnake      = snake
-                 , getEatenFruit = eatenFruit } =
+constructRow Game { getBoard      = board
+                  , getFruit      = fruit
+                  , getSnake      = snake
+                  , getEatenFruit = eatenFruit } =
   (fmap . fmap) (translateCoord fruit eatenFruit snake) board
   where
     translateCoord :: Fruit -> Maybe Fruit -> Snake -> Coord -> Char
@@ -215,8 +219,8 @@ applyBorder (xLength, _) rows  =
     border ++ fmap (\row -> "X" ++ row ++ "X") rows ++ border
 
 displayGame :: Game -> String
-displayGame game =
-  unlines . applyBorder (getBoardSize game) . constructRow $ game
+displayGame game@Game { getBoardSize = boardSize } =
+  unlines . applyBorder boardSize . constructRow $ game
 
 initScreen :: IO ()
 initScreen = do
