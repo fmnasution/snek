@@ -67,21 +67,22 @@ keypressDirection (Just 's') = Just South
 keypressDirection (Just 'd') = Just East
 keypressDirection _   = Nothing
 
+oppositeDirection :: Direction -> Direction -> Bool
+oppositeDirection North South = True
+oppositeDirection North _     = False
+oppositeDirection East West   = True
+oppositeDirection East _      = False
+oppositeDirection West East   = True
+oppositeDirection West _      = False
+oppositeDirection South North = True
+oppositeDirection South _     = False
+
 updateGameDirection :: Maybe Direction ->  Game -> Game
 updateGameDirection Nothing game = game
 updateGameDirection (Just direction) game
-  | direction `opposite` getDirection game = game
-  | otherwise                              = game { getDirection = direction }
-  where
-    opposite :: Direction -> Direction -> Bool
-    opposite North South = True
-    opposite North _     = False
-    opposite East West   = True
-    opposite East _      = False
-    opposite West East   = True
-    opposite West _      = False
-    opposite South North = True
-    opposite South _     = False
+  | direction `oppositeDirection` getDirection game = game
+  | otherwise                                       =
+    game { getDirection = direction }
 
 collideWithBorder :: BoardSize -> Snake -> Bool
 collideWithBorder (boardX, boardY) snake =
