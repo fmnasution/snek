@@ -41,6 +41,7 @@ data Game = Game { getBoardSize   :: BoardSize
                  , getDirection   :: Direction
                  , getFruit       :: Fruit
                  , getEatenFruits :: [Fruit]
+                 , getFruitsEaten :: Int
                  , getBonusFruit  :: Maybe Fruit
                  , getScore       :: Int
                  , getGameStdGen  :: StdGen }
@@ -158,9 +159,11 @@ updateGameFruitEating :: Game -> Game
 updateGameFruitEating game@Game { getSnake       = snake
                                 , getFruit       = fruit
                                 , getEatenFruits = eatenFruits
-                                , getScore       = score}
+                                , getScore       = score
+                                , getFruitsEaten = fruitsEaten}
   | fruitAtHead' = genFruit game { getEatenFruits = eatenFruits ++ [fruit]
-                                 , getScore       = score + getFruitScore fruit }
+                                 , getScore       = score + getFruitScore fruit
+                                 , getFruitsEaten = fruitsEaten + 1}
   | otherwise    = game
   where
     genFruit :: Game -> Game
@@ -232,6 +235,7 @@ initGame =
                             , getFruit       = fruit
                             , getEatenFruits = []
                             , getBonusFruit  = Nothing
+                            , getFruitsEaten = 0
                             , getGameStdGen  = gameStdGen
                             , getScore       = 0}
 
@@ -285,14 +289,14 @@ applyBorder (xLength, _) rows  =
   in
     border ++ fmap (\row -> "X" ++ row ++ "X") rows ++ border
 
-constructInfo :: Int -> [String] -> [String]
-constructInfo score rows =
-  ("SCORE: " ++ show score) : rows
+constructInfo :: Game -> [String] -> [String]
+constructInfo Game { getScore       = score
+                   , getFruitsEaten = fruitsEaten } rows =
+  ("SCORE: " ++ show score ++ " FRUITS: " ++ show fruitsEaten) : rows
 
 displayGame :: Game -> String
-displayGame game@Game { getBoardSize = boardSize
-                      , getScore     = score } =
-  unlines . constructInfo score . applyBorder boardSize . constructRow $ game
+displayGame game@Game { getBoardSize = boardSize } =
+  unlines . constructInfo game . applyBorder boardSize . constructRow $ game
 
 initScreen :: IO ()
 initScreen = do
