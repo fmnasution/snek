@@ -30,7 +30,8 @@ type Board = [[Coord]]
 
 data Direction = North | East | West | South
 
-type Fruit = Coord
+data Fruit = Fruit { getFruitPosition :: Coord
+                   , getFruitScore    :: Int}
 
 data Game = Game { getBoardSize   :: BoardSize
                  , getBoard       :: Board
@@ -44,19 +45,20 @@ data Game = Game { getBoardSize   :: BoardSize
 createBoard :: (Int, Int) -> Board
 createBoard (x, y) = [[(x', y') | x' <- [1..x]] | y' <- [1..y]]
 
-generateFruit :: Board -> StdGen -> (Fruit, StdGen)
-generateFruit board stdGen =
+generateFruit :: Int -> Board -> StdGen -> (Fruit, StdGen)
+generateFruit score board stdGen =
   let
     flattenedBoard = mconcat board
     (index, gameStdGen) = randomR (0, length flattenedBoard - 1) stdGen
     fruitPos = flattenedBoard !! index
   in
-    (fruitPos, gameStdGen)
+    (Fruit fruitPos score, gameStdGen)
 
 updateGameGenerateFruit :: Game -> Game
-updateGameGenerateFruit game@Game { getBoard = board, getGameStdGen = gameGen } =
+updateGameGenerateFruit game@Game { getBoard      = board
+                                  , getGameStdGen = gameGen } =
   let
-    (fruit, newGameStdGen) = generateFruit board gameGen
+    (fruit, newGameStdGen) = generateFruit 10 board gameGen
   in
     game { getFruit = fruit, getGameStdGen = newGameStdGen }
 
@@ -92,7 +94,7 @@ collideWithBorder (boardX, boardY) snake =
     headX < 1 || headY < 1 || headX > boardX || headY > boardY
 
 collideWithSelf :: Snake -> Bool
-collideWithSelf snake = elem (last snake) . init $ snake
+collideWithSelf snake = elem (last snake) $ init snake
 
 addCoord :: Coord -> Coord -> Coord
 addCoord (x1, y1) (x2, y2) = (x1 + x2, y1 + y2)
@@ -122,27 +124,33 @@ updateGameFruitEating game@Game { getSnake       = snake
                                 , getFruit       = fruit
                                 , getEatenFruits = eatenFruits
                                 , getScore       = score}
-  | fruit == last snake =
-      updateGameGenerateFruit game { getEatenFruits = eatenFruits ++ [fruit]
-                                   , getScore       = score + 10}
-  | otherwise           = game
+  | fruitAtHead = genFruit game { getEatenFruits = eatenFruits ++ [fruit]
+                                , getScore       = score + getFruitScore fruit}
+  | otherwise   = game
+  where
+    genFruit :: Game -> Game
+    genFruit = updateGameGenerateFruit
+
+    fruitAtHead :: Bool
+    fruitAtHead = getFruitPosition fruit == last snake
 
 updateGameGrowSnake :: Game -> Game
 updateGameGrowSnake game@Game { getEatenFruits = [] } = game
 updateGameGrowSnake game@Game
-  { getSnake = snake , getEatenFruits = (eatenFruitFirst:eatenFruitsTail) }
+  { getSnake = snake , getEatenFruits = (eatenFruit:eatenFruitsTail) }
   | shouldGrowSnake =
-      game { getSnake       = eatenFruitFirst : snake
+      game { getSnake       = getFruitPosition eatenFruit : snake
            , getEatenFruits = eatenFruitsTail }
-  | otherwise                               = game
+  | otherwise       = game
   where
     shouldGrowSnake :: Bool
     shouldGrowSnake =
       let
         (snakeTail:afterSnakeTail:_) = snake
+        eatenFruitPos = getFruitPosition eatenFruit
       in
-        isAdjacent snakeTail eatenFruitFirst
-        && eatenFruitFirst /= afterSnakeTail
+        isAdjacent snakeTail eatenFruitPos
+        && eatenFruitPos /= afterSnakeTail
 
     isAdjacent :: Coord -> Coord -> Bool
     isAdjacent c1 c2 = f North || f East || f West || f South
@@ -168,7 +176,7 @@ initGame =
   >>= \gen -> let
                 boardSize = (40, 20)
                 board = createBoard boardSize
-                (fruit, gameStdGen) = generateFruit board gen
+                (fruit, gameStdGen) = generateFruit 10 board gen
               in
                 return Game { getBoardSize   = boardSize
                             , getBoard       = board
@@ -181,10 +189,9 @@ initGame =
 
 updateGame :: Maybe Char -> Game ->  Game
 updateGame directionKey =
-  updateGameDirection direction . updateGamePerTick
+  updateGameDirection' . updateGamePerTick
   where
-    direction :: Maybe Direction
-    direction = keypressDirection directionKey
+    updateGameDirection' = updateGameDirection $ keypressDirection directionKey
 
 tickGame :: Int -> Game -> IO Game
 tickGame tickLength game =
@@ -209,10 +216,10 @@ constructRow Game { getBoard       = board
   where
     translateCoord ::  Coord -> Char
     translateCoord  coord
-      | coord `elem` eatenFruits = '$'
-      | fruit == coord           = '#'
-      | coord `elem` snake       = '@'
-      | otherwise                = ' '
+      | coord `elem` fmap getFruitPosition eatenFruits = '$'
+      | getFruitPosition fruit == coord                = '#'
+      | coord `elem` snake                             = '@'
+      | otherwise                                      = ' '
 
 applyBorder :: BoardSize -> [String] -> [String]
 applyBorder (xLength, _) rows  =
@@ -227,7 +234,7 @@ constructInfo score rows =
 
 displayGame :: Game -> String
 displayGame game@Game { getBoardSize = boardSize
-                      , getScore     = score} =
+                      , getScore     = score } =
   unlines . constructInfo score . applyBorder boardSize . constructRow $ game
 
 initScreen :: IO ()
